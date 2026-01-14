@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RE-MIND v7.5 | 과목별 프롬프트 템플릿 분리</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif; background:#f8fafc; }
+    .card { background:#fff; border:1px solid #f1f5f9; border-radius: 2.5rem; padding:2rem; box-shadow: 0 18px 40px rgba(2,6,23,.06); }
+    .gradient-header{ background: linear-gradient(135deg,#0f172a 0%,#312e81 60%,#1e1b4b 100%); }
+    .pill{ border-radius:999px; padding:.25rem .6rem; font-weight:900; font-size:10px; letter-spacing:.14em; text-transform:uppercase; }
+    .check-row{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding: .9rem 1rem; border-radius:1.4rem; border:1px solid #f1f5f9; background: rgba(255,255,255,.9); transition: all .15s ease; cursor:pointer; margin-bottom:.55rem;}
+    .check-row:hover{ border-color: rgba(99,102,241,.45); background: rgba(99,102,241,.06); transform: translateY(-1px); }
+    .check-number{ width:26px;height:26px;border-radius:999px;background:#4f46e5;color:#fff;font-weight:900;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+    .check-row input{ width:20px;height:20px; accent-color:#4f46e5; cursor:pointer; }
+    .manual-card{ padding:1.25rem 1.25rem; border-radius:1.8rem; border-left:10px solid; background:#fff; }
+    .no-export{ transition: opacity .2s; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    input[type="range"]{ -webkit-appearance:none; appearance:none; height:14px; border-radius:999px; background:#e2e8f0; outline:none; }
+    input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:26px;height:26px; border-radius:999px; background:#10b981; border:4px solid #fff; box-shadow:0 10px 18px rgba(16,185,129,.25); cursor:pointer; }
+    .gpt-box { white-space: pre-wrap; word-break: break-word; }
+    .bar-track { background:#e2e8f0; border-radius:999px; overflow:hidden; height:12px; }
+    .bar-fill { height:12px; width:0%; border-radius:999px; background: linear-gradient(90deg,#10b981,#4f46e5,#f43f5e); transition: width .25s ease; }
+    .kbd{ font-family: ui-monospace; font-size:11px; padding:2px 8px; border-radius:999px; background:#0f172a; color:#fff; }
+
+    /* Diagram UI */
+    .diagram-grid { display:grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 768px){ .diagram-grid{ grid-template-columns: 1fr 1fr; } }
+    .step { border:1px solid #e2e8f0; border-radius:1.8rem; padding:14px 16px; background:#fff; position:relative; overflow:hidden;}
+    .step:before{
+      content:""; position:absolute; inset:-2px;
+      background: radial-gradient(circle at 20% 0%, rgba(99,102,241,.20), transparent 55%),
+                  radial-gradient(circle at 80% 100%, rgba(16,185,129,.18), transparent 55%);
+      z-index:0;
+    }
+    .step > *{ position:relative; z-index:1; }
+    .badge { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:999px; font-weight:900; font-size:11px; color:#fff; }
+    .arrow { height: 10px; border-radius: 999px; background: linear-gradient(90deg, rgba(99,102,241,.55), rgba(16,185,129,.55)); }
+    .spark { font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; }
+
+    /* NEW: Subject UI */
+    select, textarea {
+      outline: none;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 140px;
+    }
+  </style>
+</head>
+
+<body class="p-4 md:p-8 lg:p-12" id="reportArea">
+  <div class="max-w-7xl mx-auto space-y-8">
+
+    <!-- Top bar -->
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 no-export">
+      <div>
+        <h2 class="text-xs font-black text-slate-400 tracking-widest uppercase italic">Metacognition × Forgetting Curve Report</h2>
+        <p class="text-[11px] text-slate-500 mt-1">v7.5: 과목별 프롬프트/루틴 분리 + GPT 템플릿 자동 생성</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button onclick="saveReport()" class="px-6 py-2.5 bg-indigo-600 text-white text-xs font-black rounded-full hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all">📸 이미지로 저장</button>
+        <button onclick="window.print()" class="px-6 py-2.5 bg-slate-900 text-white text-xs font-black rounded-full hover:bg-black shadow-xl transition-all">📄 PDF 출력</button>
+        <button onclick="resetAll()" class="px-6 py-2.5 bg-slate-100 text-slate-900 text-xs font-black rounded-full hover:bg-slate-200 transition-all">♻️ 초기화</button>
+      </div>
+    </div>
+
+    <!-- Header cards -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div class="md:col-span-6 gradient-header p-8 rounded-[2.5rem] text-white shadow-2xl flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-black italic tracking-tighter text-indigo-300 uppercase">RE-MIND v7.5</h1>
+          <p class="text-xs opacity-70 mt-1 font-bold italic tracking-widest">Subject Prompt Template Mode</p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <span class="pill bg-white/10 text-indigo-100">Prompt</span>
+            <span class="pill bg-white/10 text-indigo-100">Routine</span>
+            <span class="pill bg-white/10 text-indigo-100">Action</span>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] font-black opacity-60 uppercase">Meta Accuracy</p>
+          <div id="metaDisplay" class="text-5xl font-black text-yellow-300">0%</div>
+          <p class="text-[10px] font-black opacity-60 uppercase mt-3">Correlation</p>
+          <div class="text-2xl font-black text-emerald-300"><span id="corrDisplay">0.00</span></div>
+        </div>
+      </div>
+
+      <div class="md:col-span-3 card flex flex-col justify-center items-center text-center bg-indigo-50/50 border-indigo-100">
+        <p class="text-[10px] font-black text-indigo-400 mb-1 uppercase tracking-widest">Self-Confidence</p>
+        <div id="confDisplay" class="text-5xl font-black text-indigo-700">0%</div>
+        <div class="mt-4 text-[11px] text-slate-500">
+          <span class="font-black text-slate-700">착각 위험도</span> = <span id="illusionRisk" class="font-black">0</span>/100
+        </div>
+      </div>
+
+      <div class="md:col-span-3 card bg-slate-900 text-white flex flex-col justify-center items-center">
+        <p class="text-[10px] font-black opacity-60 mb-1 uppercase tracking-widest">Grade</p>
+        <div id="gradeDisplay" class="text-6xl font-black text-yellow-400">-</div>
+        <div class="mt-3 text-[11px] opacity-70">
+          31일 예상 점수: <span id="day31Score" class="font-black">-</span>%
+        </div>
+      </div>
+    </div>
+
+    <!-- Main layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+      <!-- LEFT -->
+      <div class="lg:col-span-5 space-y-6">
+
+        <div class="card border-t-[12px] border-indigo-600">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-xl font-black text-slate-800 flex items-center gap-2">🧠 메타인지 진단</h3>
+            <div class="flex gap-2">
+              <span class="pill bg-slate-100 text-slate-700">10문항</span>
+              <span class="pill bg-emerald-100 text-emerald-700">인출점수</span>
+            </div>
+          </div>
+
+          <p class="text-[12px] text-slate-500 mt-3 leading-relaxed">
+            체크박스=확신, 슬라이더=인출 점수. Gap이 커질수록 ‘안다는 착각’이 강해져 점수 하락이 빨라집니다.
+          </p>
+
+          <div id="metaChecklist" class="mt-6"></div>
+
+          <div class="mt-8 pt-8 border-t border-slate-100">
+            <div class="flex justify-between items-end mb-2">
+              <label class="text-sm font-black text-emerald-700 italic">실제 인출 점수 (Reality)</label>
+              <span id="scoreText" class="text-2xl font-black text-emerald-600">50%</span>
+            </div>
+            <input type="range" id="scoreInput" min="0" max="100" value="50" class="w-full no-export" oninput="runAnalysis()" />
+
+            <div class="grid grid-cols-3 gap-3 mt-4">
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Gap</div>
+                <div class="text-2xl font-black text-slate-800"><span id="gapDisplay">0</span>%</div>
+              </div>
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Forgetting Risk</div>
+                <div class="text-2xl font-black text-rose-600"><span id="riskDisplay">0</span>/100</div>
+              </div>
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Review Boost</div>
+                <div class="text-2xl font-black text-indigo-700">+<span id="boostDisplay">0</span></div>
+              </div>
+            </div>
+
+            <div class="mt-4 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 text-[12px] text-indigo-900">
+              아래 “과목별 프롬프트/루틴”이 현재 상태를 자동 요약해줍니다.
+            </div>
+          </div>
+        </div>
+
+        <div id="solutionCard" class="card hidden border-t-[12px]">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xl font-black text-slate-800">💡 성적상승 솔루션</h3>
+            <div class="text-[11px] text-slate-500">추천 복습 강도: <span id="intensity" class="font-black text-slate-800">-</span></div>
+          </div>
+
+          <div class="mt-5 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+            <p id="resultAnalysis" class="text-sm font-black text-slate-800"></p>
+            <p id="resultSolution" class="text-xs text-slate-600 leading-relaxed mt-2"></p>
+
+            <div class="mt-5 grid grid-cols-2 gap-4">
+              <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-center">
+                <p class="text-[9px] font-black text-indigo-700 mb-1 tracking-widest">NEXT ACTION</p>
+                <p id="nextAction" class="text-[11px] font-bold text-indigo-950"></p>
+              </div>
+              <div class="p-4 bg-rose-50 rounded-2xl border border-rose-100 text-center">
+                <p class="text-[9px] font-black text-rose-700 mb-1 tracking-widest">RISK ALERT</p>
+                <p id="riskAlert" class="text-[11px] font-bold text-rose-950"></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 p-6 rounded-[2rem] bg-white border border-slate-100">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-black text-slate-800">🗓️ 권장 복습 타이밍</h4>
+              <span class="pill bg-emerald-100 text-emerald-700">Auto</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2 leading-relaxed">
+              “점수 하락 직전”에 복습이 걸리도록 추천합니다. 완료 체크 시 보정 점수에 반영됩니다.
+            </p>
+            <div id="reviewPlan" class="mt-4 space-y-2"></div>
+            <div class="mt-4 text-[11px] text-slate-500">
+              * 원리: <span class="mono">망각속도 × (1 + 착각위험) − 복습완료 보정</span>
+            </div>
+          </div>
+
+          <!-- NEW: Subject Prompt + Routine -->
+          <div class="mt-6 p-6 rounded-[2rem] bg-slate-900 text-white border border-slate-800">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h4 class="text-sm font-black">🧠 과목별 프롬프트 템플릿 (국어/수학/영어/탐구)</h4>
+                <p class="text-[11px] opacity-70 mt-1">선택 과목에 따라 “루틴+질문 프롬프트”가 자동으로 바뀝니다.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="pill bg-white/10 text-white">SUBJECT</span>
+                <select id="subjectSelect" class="px-4 py-2 rounded-full bg-white text-slate-900 text-xs font-black" onchange="runAnalysis()">
+                  <option value="kor">국어</option>
+                  <option value="math">수학</option>
+                  <option value="eng">영어</option>
+                  <option value="sci">탐구</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                <div class="text-[10px] font-black tracking-widest opacity-70">SUBJECT ROUTINE</div>
+                <div id="subjectRoutine" class="mt-2 text-[12px] leading-relaxed"></div>
+                <div class="mt-3 text-[11px] opacity-70">
+                  추천 복습창: <span id="subjectWindow" class="font-black text-emerald-300">-</span>
+                </div>
+              </div>
+
+              <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                <div class="flex items-center justify-between">
+                  <div class="text-[10px] font-black tracking-widest opacity-70">PROMPT (COPY)</div>
+                  <button onclick="copyPrompt()" class="px-3 py-1.5 rounded-full bg-white text-slate-900 text-[11px] font-black hover:bg-slate-200">복사</button>
+                </div>
+                <textarea id="promptBox" class="mt-3 w-full rounded-2xl p-4 bg-white text-slate-900 text-[11px] font-bold"></textarea>
+                <div id="copyHint" class="mt-2 text-[11px] text-emerald-300 font-black hidden">복사 완료 ✅</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- chart -->
+        <div class="card relative border-t-[12px] border-rose-500">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-xl font-black text-slate-800">📈 통합 성적 시뮬레이션</h3>
+              <p class="text-[12px] text-slate-500 mt-2 leading-relaxed">
+                로즈 점선=자연망각. 인디고 실선=(메타×인출×복습완료) 보정.
+              </p>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] font-black uppercase tracking-widest text-slate-400">window</div>
+              <div id="windowHint" class="text-[11px] font-black text-rose-600">-</div>
+            </div>
+          </div>
+          <div class="mt-6 h-[420px]"><canvas id="integratedChart"></canvas></div>
+        </div>
+
+        <!-- Beginner Diagram Board -->
+        <div class="card border-t-[12px] border-emerald-500 bg-white">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-black text-slate-800">🧩 초보자 도식화 판: 망각곡선 × 메타인지</h3>
+            <span class="pill bg-emerald-100 text-emerald-700">EASY</span>
+          </div>
+
+          <p class="text-[12px] text-slate-500 mt-3 leading-relaxed">
+            핵심은 한 줄입니다. <span class="font-black text-slate-800">“망각은 자동으로 내려가고, 메타인지는 복습 타이밍을 정확히 찍어 올린다.”</span>
+          </p>
+
+          <div class="mt-5 diagram-grid">
+            <div class="step">
+              <div class="flex items-center gap-3">
+                <span class="badge" style="background:#f43f5e;">1</span>
+                <div>
+                  <div class="text-sm font-black text-slate-900">망각곡선(자연 하락)</div>
+                  <div class="text-[11px] text-slate-500">복습이 없으면 점수는 시간에 비례해 떨어짐</div>
+                </div>
+              </div>
+              <div class="mt-3 p-4 rounded-2xl bg-rose-50 border border-rose-100 text-[12px] text-rose-900 leading-relaxed">
+                • 뇌는 “안 쓰는 정보”를 버립니다<br>
+                • 그래서 <span class="font-black">20분~1시간~하루</span> 구간에서 가장 급격히 떨어집니다
+              </div>
+              <div class="mt-3">
+                <div class="spark text-rose-600">NOW</div>
+                <div class="text-[12px] text-slate-700 mt-1">
+                  현재 위험도: <span id="diagRisk" class="font-black text-rose-600">0</span>/100
+                </div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="flex items-center gap-3">
+                <span class="badge" style="background:#4f46e5;">2</span>
+                <div>
+                  <div class="text-sm font-black text-slate-900">메타인지(안다는 착각 제거)</div>
+                  <div class="text-[11px] text-slate-500">확신 vs 인출이 맞아야 점수가 버팀</div>
+                </div>
+              </div>
+              <div class="mt-3 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 text-[12px] text-indigo-900 leading-relaxed">
+                • <span class="font-black">확신(체크)</span>은 느낌이고<br>
+                • <span class="font-black">인출(점수)</span>은 실전입니다<br>
+                • 둘의 차이(<span class="font-black">Gap</span>)가 클수록 실전에서 무너집니다
+              </div>
+              <div class="mt-3">
+                <div class="spark text-indigo-700">NOW</div>
+                <div class="text-[12px] text-slate-700 mt-1">
+                  현재 Gap: <span id="diagGap" class="font-black text-slate-900">0</span>% /
+                  메타정확도: <span id="diagMeta" class="font-black text-indigo-700">0</span>%
+                </div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="flex items-center gap-3">
+                <span class="badge" style="background:#10b981;">3</span>
+                <div>
+                  <div class="text-sm font-black text-slate-900">해결: 복습 “타이밍”이 전부</div>
+                  <div class="text-[11px] text-slate-500">하락 직전에 인출 복습으로 반등</div>
+                </div>
+              </div>
+              <div class="mt-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-[12px] text-emerald-900 leading-relaxed">
+                • 복습은 ‘많이’가 아니라 ‘제때’가 핵심<br>
+                • 추천 창(20m/1h/9h/1d…)에서 <span class="font-black">백지 인출</span>하면 점수가 올라갑니다
+              </div>
+              <div class="mt-3">
+                <div class="spark text-emerald-700">NOW</div>
+                <div class="text-[12px] text-slate-700 mt-1">
+                  추천 복습창: <span id="diagWindow" class="font-black text-emerald-700">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="flex items-center gap-3">
+                <span class="badge" style="background:#0f172a;">4</span>
+                <div>
+                  <div class="text-sm font-black text-slate-900">한 장 요약: 오늘의 행동</div>
+                  <div class="text-[11px] text-slate-500">초보자는 이 3개만 하면 됨</div>
+                </div>
+              </div>
+              <div class="mt-3 p-4 rounded-2xl bg-slate-900 text-white rounded-2xl">
+                <div class="text-[12px] leading-relaxed">
+                  • (1) <span class="font-black">백지 5분</span>으로 “어디가 비는지” 확인<br>
+                  • (2) 빈칸 3개만 <span class="font-black">오답카드</span>로 만들기<br>
+                  • (3) 추천 복습창에 <span class="font-black">딱 10분</span> 재인출
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="spark text-slate-700">NOW</div>
+                <div class="text-[12px] text-slate-700 mt-1">
+                  현재 등급 예측: <span id="diagGrade" class="font-black text-slate-900">-</span> /
+                  31일: <span id="diag31" class="font-black text-yellow-600">-</span>%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 p-5 rounded-[2rem] bg-slate-50 border border-slate-100">
+            <div class="flex items-center justify-between">
+              <div class="text-[12px] font-black text-slate-800">“Gap이 커질 때” 초보자 빠른 처방</div>
+              <span class="pill bg-rose-100 text-rose-700">ANTI-ILLUSION</span>
+            </div>
+            <div class="mt-3">
+              <div class="arrow mb-3"></div>
+              <div class="text-[12px] text-slate-700 leading-relaxed">
+                • 읽기→필기→밑줄은 <span class="font-black">확신만 올리고 점수는 안 오를 수 있음</span><br>
+                • 그래서 Gap이 커지면, 무조건 <span class="font-black">인출(문제/백지/설명)</span>로 전환해야 함
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- manual -->
+        <div class="card bg-slate-50 border-none">
+          <h3 class="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">📖 해석 매뉴얼</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="manual-card border-indigo-500">
+              <h4 class="font-black text-indigo-700 text-sm mb-2">실선이 점선보다 빨리 떨어지면</h4>
+              <p class="text-[11px] text-slate-600 leading-relaxed">“아는 느낌”만 있고 인출이 안 되는 상태. 즉시 백지 인출/퀴즈로 전환.</p>
+            </div>
+            <div class="manual-card border-rose-400">
+              <h4 class="font-black text-rose-600 text-sm mb-2">실선이 점선보다 잘 버티면</h4>
+              <p class="text-[11px] text-slate-600 leading-relaxed">메타인지가 안정. 복습창만 지키면 실전 점수로 이어짐.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+<script>
+  Chart.register(ChartDataLabels);
+
+  const questions = [
+    "목차 3개 나열","타인에게 설명","유사 개념 구분","나만의 사례",
+    "마인드맵 구성","키워드 정의","도출 과정 이해","적용 상황 인지",
+    "3초 내 답변","모호함 없음"
+  ];
+  const labels = ['학습','20분','1시간','9시간','1일','2일','6일','31일'];
+  const baseForget = [100,58,44,35,33,27,25,21];
+
+  const planItems = [
+    { key:'r20m', label:'20분 복습 (초단기 고정)', idx:1 },
+    { key:'r1h',  label:'1시간 복습 (유창성 제거)', idx:2 },
+    { key:'r9h',  label:'9시간 복습 (당일 마감)', idx:3 },
+    { key:'r1d',  label:'1일 복습 (1차 강화)', idx:4 },
+    { key:'r2d',  label:'2일 복습 (2차 강화)', idx:5 },
+    { key:'r6d',  label:'6일 복습 (장기 고정)', idx:6 },
+    { key:'r31d', label:'31일 복습 (완전 장기)', idx:7 },
+  ];
+  const state = { done: Object.fromEntries(planItems.map(p => [p.key, false])) };
+
+  const checklistWrap = document.getElementById('metaChecklist');
+  const reviewPlanWrap = document.getElementById('reviewPlan');
+
+  // ===== NEW: Subject Templates =====
+  const SUBJECTS = {
+    kor: {
+      name: "국어",
+      routine: (ctx) => `
+• (1) 지문: <b>문단별 1문장 요약</b> → <b>근거 표시(문장 번호)</b><br>
+• (2) 문제: <b>선지 오답근거 1줄</b> (왜 틀렸는지/왜 맞는지)<br>
+• (3) 취약: <b>유형 태그</b>(추론/비판/어휘/구조/도표)<br>
+• (4) 복습: 추천 복습창에 <b>지문 5분 재구성 + 오답 선지 재판단</b>`,
+      prompt: (ctx) => `
+[국어 전용 학습 코치 프롬프트]
+너는 국어(독서/문학) 성적을 올리는 코치다. 아래 진단값을 보고 오늘 학습을 '지문→문제→오답→복습창' 루틴으로 설계해라.
+
+- 현재 확신(체크): ${ctx.confidence}%
+- 실제 인출 점수: ${ctx.score}%
+- Gap: ${ctx.gap}%
+- 메타정확도: ${ctx.metaAccuracy}%
+- 착각위험: ${ctx.illusionRisk}/100
+- 망각위험: ${ctx.forgettingRisk}/100
+- 추천 복습창: ${ctx.windowText}
+- 31일 예측: ${ctx.day31}% / 등급: ${ctx.grade}
+
+출력 규칙:
+1) 오늘 할 일 3개(각 10~20분)로 쪼개기
+2) 지문은 문단별 1문장 요약 + 근거문장 번호를 강제
+3) 오답은 '선지별 오답근거 1줄' 형식(모르면 추정 금지)
+4) Gap이 ${ctx.gap}%이므로, 읽기/밑줄 대신 '백지 인출/설명'을 우선 배치
+5) 추천 복습창(${ctx.windowText})에 맞춰 타임라인을 써라
+`
+    },
+
+    math: {
+      name: "수학",
+      routine: (ctx) => `
+• (1) 개념: <b>정의/조건/결론 3줄</b>로 말하기(백지)<br>
+• (2) 문제: <b>풀이를 3단계</b>(핵심 아이디어→계산→검산)로 분해<br>
+• (3) 오답: <b>오답원인 1개만</b>(조건누락/식변형/케이스/부호/계산)<br>
+• (4) 복습: 추천 복습창에 <b>유사문항 2개</b> “시간 제한” 재인출`,
+      prompt: (ctx) => `
+[수학 전용 학습 코치 프롬프트]
+너는 수학 성적을 올리는 코치다. 아래 진단값을 보고 오늘 학습을 '개념→유형→오답원인→재인출' 루틴으로 설계해라.
+
+- 확신: ${ctx.confidence}%
+- 인출 점수: ${ctx.score}%
+- Gap: ${ctx.gap}%
+- 메타정확도: ${ctx.metaAccuracy}%
+- 착각위험: ${ctx.illusionRisk}/100
+- 망각위험: ${ctx.forgettingRisk}/100
+- 추천 복습창: ${ctx.windowText}
+- 31일 예측: ${ctx.day31}% / 등급: ${ctx.grade}
+
+출력 규칙:
+1) 오늘 해야 할 문제 세트 구성(난이도: 하/중/상 비율 제시)
+2) 각 세트는 '핵심 아이디어 1줄'을 먼저 쓰게 만들기
+3) 오답은 원인 1개만 고르고, 그 원인을 막는 체크리스트 1개 제시
+4) Gap이 크면(현재 ${ctx.gap}%), 풀이보기/해설읽기 금지 → 반드시 백지 재구성
+5) 추천 복습창(${ctx.windowText}) 기준으로 “재인출 타이밍”을 구체 시간표로 써라
+`
+    },
+
+    eng: {
+      name: "영어",
+      routine: (ctx) => `
+• (1) 독해: <b>문장구조(주어/동사/수식)</b>를 표시하며 3문장 해석<br>
+• (2) 어휘: 지문에서 <b>핵심 10개</b>만 뽑아 “예문 1개” 만들기<br>
+• (3) 오답: <b>근거문장 1개</b> + 왜 선지가 틀렸는지 1줄<br>
+• (4) 복습: 추천 복습창에 <b>같은 지문 5분 재독 + 빈칸 인출</b>`,
+      prompt: (ctx) => `
+[영어 전용 학습 코치 프롬프트]
+너는 영어 성적을 올리는 코치다. 아래 진단값을 보고 오늘 학습을 '구조→근거→어휘→재독/인출' 루틴으로 설계해라.
+
+- 확신: ${ctx.confidence}%
+- 인출 점수: ${ctx.score}%
+- Gap: ${ctx.gap}%
+- 메타정확도: ${ctx.metaAccuracy}%
+- 착각위험: ${ctx.illusionRisk}/100
+- 망각위험: ${ctx.forgettingRisk}/100
+- 추천 복습창: ${ctx.windowText}
+- 31일 예측: ${ctx.day31}% / 등급: ${ctx.grade}
+
+출력 규칙:
+1) 오늘 3세트(독해/어휘/오답)로 쪼개기
+2) 독해는 '구조표시→근거문장→선지판단' 순서 고정
+3) 어휘는 많이 말고 10개만(예문 1개 포함)
+4) Gap이 ${ctx.gap}%이면 감으로 푸는 습관 차단: 항상 근거문장 1개 제출
+5) 추천 복습창(${ctx.windowText})에 맞춘 재독/인출 타임라인 제시
+`
+    },
+
+    sci: {
+      name: "탐구",
+      routine: (ctx) => `
+• (1) 개념: <b>키워드-정의-예외</b>를 1세트로 카드화<br>
+• (2) 문제: <b>선지 판단 규칙</b>(조건/단서/그래프 읽기)을 1줄로 정리<br>
+• (3) 오답: <b>개념오류 vs 해석오류</b> 중 하나로 분류<br>
+• (4) 복습: 추천 복습창에 <b>카드 15장 인출 + 대표 문항 1개</b>`,
+      prompt: (ctx) => `
+[탐구 전용 학습 코치 프롬프트]
+너는 탐구(과학/사회) 성적을 올리는 코치다. 아래 진단값을 보고 오늘 학습을 '개념카드→선지규칙→오답분류→재인출'로 설계해라.
+
+- 확신: ${ctx.confidence}%
+- 인출 점수: ${ctx.score}%
+- Gap: ${ctx.gap}%
+- 메타정확도: ${ctx.metaAccuracy}%
+- 착각위험: ${ctx.illusionRisk}/100
+- 망각위험: ${ctx.forgettingRisk}/100
+- 추천 복습창: ${ctx.windowText}
+- 31일 예측: ${ctx.day31}% / 등급: ${ctx.grade}
+
+출력 규칙:
+1) 오늘 할 일 3개(개념카드/문제/오답)로 설계
+2) 오답은 반드시 '개념오류/해석오류/조건누락' 중 1개로 분류
+3) 선지 판단 규칙을 1줄로 만들고 다음 문항에 적용
+4) Gap이 ${ctx.gap}%이면 요약읽기 금지 → 카드 인출/선지 규칙 생성 우선
+5) 추천 복습창(${ctx.windowText})에 맞춘 카드 재인출 계획 제시
+`
+    }
+  };
+
+  function getSubjectKey(){
+    const el = document.getElementById('subjectSelect');
+    return el ? el.value : 'kor';
+  }
+
+  function setPromptAndRoutine(ctx){
+    const key = getSubjectKey();
+    const subj = SUBJECTS[key] || SUBJECTS.kor;
+    const routineEl = document.getElementById('subjectRoutine');
+    const promptEl = document.getElementById('promptBox');
+    const windowEl = document.getElementById('subjectWindow');
+
+    if (routineEl) routineEl.innerHTML = subj.routine(ctx);
+    if (windowEl) windowEl.textContent = ctx.windowText || '-';
+    if (promptEl) promptEl.value = subj.prompt(ctx).trim();
+  }
+
+  function copyPrompt(){
+    const box = document.getElementById('promptBox');
+    if (!box) return;
+    box.select();
+    box.setSelectionRange(0, 999999);
+    try{
+      document.execCommand('copy');
+      const hint = document.getElementById('copyHint');
+      if (hint){
+        hint.classList.remove('hidden');
+        setTimeout(()=>hint.classList.add('hidden'), 900);
+      }
+    }catch(e){
+      alert('복사 실패: 브라우저 권한을 확인하세요.');
+    }
+  }
+
+  // ===== Checklist Render =====
+  questions.forEach((q, i) => {
+    const row = document.createElement('label');
+    row.className = 'check-row';
+    row.innerHTML = `
+      <div class="flex items-center gap-3">
+        <span class="check-number">${i+1}</span>
+        <span class="text-xs font-bold text-slate-700">${q}</span>
+      </div>
+      <input type="checkbox" class="meta-check" onchange="runAnalysis()">
+    `;
+    checklistWrap.appendChild(row);
+  });
+
+  function renderPlan(recommendedSet = new Set()) {
+    reviewPlanWrap.innerHTML = '';
+    planItems.forEach(p => {
+      const isRec = recommendedSet.has(p.key);
+      const row = document.createElement('label');
+      row.className = 'check-row';
+      row.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span class="check-number">R</span>
+          <div class="flex flex-col">
+            <span class="text-xs font-black ${isRec ? 'text-rose-600' : 'text-slate-800'}">
+              ${p.label} ${isRec ? '<span class="ml-2 pill bg-rose-100 text-rose-700">HIGH RISK</span>' : ''}
+            </span>
+            <span class="text-[11px] text-slate-500">완료 체크 시 보정 점수에 반영</span>
+          </div>
+        </div>
+        <input type="checkbox" ${state.done[p.key] ? 'checked' : ''} onchange="toggleDone('${p.key}')">
+      `;
+      reviewPlanWrap.appendChild(row);
+    });
+  }
+  function toggleDone(key){ state.done[key] = !state.done[key]; runAnalysis(); }
+
+  const clamp = (v,min,max) => Math.max(min, Math.min(max, v));
+  const round = (v) => Math.round(v);
+
+  function pseudoCorrelation(metaAccuracy, longTerm){
+    const m = metaAccuracy/100;
+    const l = longTerm/100;
+    return clamp(0.15 + 0.55*m + 0.30*l, 0, 1);
+  }
+
+  function computeReviewBoost(metaAccuracy, illusionRisk, doneCount){
+    const m = metaAccuracy/100;
+    const ir = illusionRisk/100;
+    const d = clamp(doneCount/7, 0, 1);
+    return 18*(0.55*m + 0.35*d + 0.10*(1-ir));
+  }
+
+  function computeForgettingRisk(metaAccuracy, gap, confidenceAboveReality){
+    const m = metaAccuracy/100;
+    const g = clamp(gap/100, 0, 1);
+    const bias = confidenceAboveReality ? 1 : 0.65;
+    return 100 * clamp((0.20 + 0.85*g)*bias*(1 - 0.55*m), 0, 1);
+  }
+
+  function computeRecommendedWindow(forgettingRisk, metaAccuracy, gap, confidence, score){
+    const rec = new Set();
+    const r = forgettingRisk;
+    const m = metaAccuracy;
+    const overConf = confidence > score;
+
+    if (r >= 70 || (overConf && gap > 20)) { rec.add('r20m'); rec.add('r1h'); rec.add('r9h'); rec.add('r1d'); }
+    else if (r >= 50) { rec.add('r1h'); rec.add('r9h'); rec.add('r1d'); rec.add('r2d'); }
+    else if (r >= 30) { rec.add('r9h'); rec.add('r1d'); rec.add('r2d'); }
+    else { rec.add('r1d'); rec.add('r2d'); rec.add('r6d'); }
+
+    if (m >= 75) rec.add('r31d');
+    else if (m >= 55) rec.add('r6d');
+
+    return rec;
+  }
+
+  function updateDiagram(confidence, score, metaAccuracy, gap, forgettingRisk, day31, windowText, grade){
+    document.getElementById('diagRisk').textContent = round(forgettingRisk);
+    document.getElementById('diagGap').textContent = gap;
+    document.getElementById('diagMeta').textContent = metaAccuracy;
+    document.getElementById('diagWindow').textContent = windowText || '-';
+    document.getElementById('diagGrade').textContent = grade || '-';
+    document.getElementById('diag31').textContent = day31;
+  }
+
+  let mainChart;
+
+  function runAnalysis(){
+    const checks = document.querySelectorAll('.meta-check');
+    const confidence = Array.from(checks).filter(c => c.checked).length * 10;
+    const score = parseInt(document.getElementById('scoreInput').value, 10);
+    const gap = Math.abs(confidence - score);
+    const metaAccuracy = 100 - gap;
+    const overConf = confidence > score;
+    const illusionRisk = clamp(overConf ? (gap*1.2) : (gap*0.8), 0, 100);
+
+    const doneCount = Object.values(state.done).filter(Boolean).length;
+
+    const forgettingRisk = computeForgettingRisk(metaAccuracy, gap, overConf);
+    const boost = computeReviewBoost(metaAccuracy, illusionRisk, doneCount);
+
+    const rec = computeRecommendedWindow(forgettingRisk, metaAccuracy, gap, confidence, score);
+    renderPlan(rec);
+
+    document.getElementById('confDisplay').textContent = confidence + '%';
+    document.getElementById('scoreText').textContent = score + '%';
+    document.getElementById('metaDisplay').textContent = metaAccuracy + '%';
+    document.getElementById('gapDisplay').textContent = gap;
+    document.getElementById('illusionRisk').textContent = round(illusionRisk);
+    document.getElementById('riskDisplay').textContent = round(forgettingRisk);
+    document.getElementById('boostDisplay').textContent = round(boost);
+
+    const solCard = document.getElementById('solutionCard');
+    solCard.classList.remove('hidden');
+
+    let intensityText = '보통';
+    if (forgettingRisk >= 70) intensityText = '매우 높음 (즉시 인출)';
+    else if (forgettingRisk >= 50) intensityText = '높음 (단기 3연타)';
+    else if (forgettingRisk >= 30) intensityText = '중간 (1~2일 중심)';
+    else intensityText = '낮음 (장기 고정)';
+    document.getElementById('intensity').textContent = intensityText;
+
+    if (gap > 20 && overConf) {
+      solCard.style.borderTopColor = "#f43f5e";
+      document.getElementById('resultAnalysis').textContent = "과잉 확신 경보 (유창성 편향)";
+      document.getElementById('resultSolution').textContent = "읽으면 다 아는 것 같지만 인출하면 무너지는 상태입니다. 단기 복습창을 강하게 잡아야 합니다.";
+      document.getElementById('nextAction').textContent = "백지 인출 5분 → 즉시 채점";
+      document.getElementById('riskAlert').textContent = "실전 실수 폭발 위험";
+    } else if (gap <= 15) {
+      solCard.style.borderTopColor = "#10b981";
+      document.getElementById('resultAnalysis').textContent = "메타인지 안정권 (객관적 인지)";
+      document.getElementById('resultSolution').textContent = "현재 학습은 실력 전환 중입니다. 난이도/전이 중심으로 점수 상승 레버를 당기세요.";
+      document.getElementById('nextAction').textContent = "심화 응용 문제 10개";
+      document.getElementById('riskAlert').textContent = "장기 기억 전환";
+    } else {
+      solCard.style.borderTopColor = "#4f46e5";
+      document.getElementById('resultAnalysis').textContent = "보수적 학습 (과소 평가)";
+      document.getElementById('resultSolution').textContent = "실력에 비해 자신감이 낮습니다. 반복 대신 실전형 문제량으로 성공 경험을 누적하세요.";
+      document.getElementById('nextAction').textContent = "중상 난도 실전세트 1회";
+      document.getElementById('riskAlert').textContent = "과복습으로 효율 저하";
+    }
+
+    const longWeights = [0.00,0.05,0.10,0.18,0.28,0.40,0.58,0.78];
+    const corrected = baseForget.map((b, idx) => {
+      const longW = longWeights[idx];
+      const shortW = 1 - longW;
+
+      let v = (b*0.40) + (score*0.60);
+      v += 22 * ((metaAccuracy/100) - 0.5) * longW;
+      v += boost * (0.35 + 0.65*longW);
+
+      const penalty = (overConf ? 28 : 18) * (0.25 + 0.75*longW) * (0.55*(illusionRisk/100) + 0.45*(forgettingRisk/100));
+      v -= penalty;
+
+      v = v * (0.92 + 0.08*shortW);
+      return clamp(round(v), 0, 110);
+    });
+
+    const day31 = corrected[7];
+    document.getElementById('day31Score').textContent = day31;
+
+    const grade =
+      day31 >= 90 ? 'A+' : day31 >= 80 ? 'A' : day31 >= 70 ? 'B+' : day31 >= 60 ? 'B' : day31 >= 50 ? 'C' : 'D';
+    document.getElementById('gradeDisplay').textContent = grade;
+
+    const corr = pseudoCorrelation(metaAccuracy, day31);
+    document.getElementById('corrDisplay').textContent = corr.toFixed(2);
+
+    const windowText = (() => {
+      const arr = [];
+      if (rec.has('r20m')) arr.push('20분');
+      if (rec.has('r1h')) arr.push('1시간');
+      if (rec.has('r9h')) arr.push('9시간');
+      if (rec.has('r1d')) arr.push('1일');
+      if (rec.has('r2d')) arr.push('2일');
+      if (rec.has('r6d')) arr.push('6일');
+      if (rec.has('r31d')) arr.push('31일');
+      return arr.length ? (arr.slice(0,4).join(' · ') + (arr.length>4?' …':'')) : '-';
+    })();
+    document.getElementById('windowHint').textContent = windowText;
+
+    updateDiagram(confidence, score, metaAccuracy, gap, forgettingRisk, day31, windowText, grade);
+
+    // ===== NEW: subject prompt/routine auto build =====
+    const ctx = {
+      confidence, score, gap, metaAccuracy,
+      illusionRisk: round(illusionRisk),
+      forgettingRisk: round(forgettingRisk),
+      boost: round(boost),
+      windowText,
+      day31,
+      grade
+    };
+    setPromptAndRoutine(ctx);
+
+    if (mainChart) mainChart.destroy();
+    const ctx2 = document.getElementById('integratedChart').getContext('2d');
+    mainChart = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: '상관 기반 보정 점수',
+            data: corrected,
+            borderColor: '#4338ca',
+            backgroundColor: 'rgba(67,56,202,.08)',
+            borderWidth: 6,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            tension: 0.25,
+            fill: true,
+            datalabels: { align:'top', anchor:'end', formatter:(v)=>v+'%', font:{weight:'900'} }
+          },
+          {
+            label: '자연 망각 (Ebbinghaus)',
+            data: baseForget,
+            borderColor: '#f43f5e',
+            borderWidth: 4,
+            borderDash: [6,6],
+            pointRadius: 5,
+            tension: 0.25,
+            fill: false,
+            datalabels: { align:'bottom', anchor:'end', formatter:(v)=>v+'%', font:{weight:'900'} }
+          }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        layout:{ padding:{ top:35, bottom:20, left:10, right:10 } },
+        plugins:{
+          legend:{ display:false },
+          datalabels:{ clip:false },
+          tooltip:{ callbacks:{ label:(c)=> `${c.dataset.label}: ${c.parsed.y}%` } }
+        },
+        scales:{
+          x:{ grid:{ display:false }, ticks:{ font:{ weight:'800' } } },
+          y:{ min:0, max:125, ticks:{ display:false }, grid:{ color:'rgba(2,6,23,.06)' } }
+        }
+      }
+    });
+  }
+
+  function resetAll(){
+    document.querySelectorAll('.meta-check').forEach(x => x.checked = false);
+    document.getElementById('scoreInput').value = 50;
+    Object.keys(state.done).forEach(k => state.done[k] = false);
+    // subject stays as user selection
+    runAnalysis();
+  }
+
+  function saveReport() {
+    const btnArea = document.querySelector('.no-export');
+    btnArea.style.opacity = '0';
+    html2canvas(document.body, { scale: 2 }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = `RE-MIND_Report_${new Date().toLocaleDateString()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      btnArea.style.opacity = '1';
+    }).catch(() => {
+      btnArea.style.opacity = '1';
+      alert('이미지 저장 중 오류가 발생했습니다. (브라우저 권한/메모리 확인)');
+    });
+  }
+
+  // init
+  renderPlan(new Set());
+  window.onload = runAnalysis;
+</script>
+</body>
+</html>
